@@ -1,0 +1,42 @@
+Code,Group,Currency,DisplayName
+US,G10,USD Curncy,United States
+CA,G10,CAD Curncy,Canada
+GB,G10,GBP Curncy,United Kingdom
+JP,G10,JPY Curncy,Japan
+EA,G10,EUR Curncy,Euro Area
+CH,G10,CHF Curncy,Switzerland
+SE,G10,SEK Curncy,Sweden
+NO,G10,NOK Curncy,Norway
+AU,G10,AUD Curncy,Australia
+NZ,G10,NZD Curncy,New Zealand
+BR,EM Main,BRL Curncy,Brazil
+CL,EM Main,CLP Curncy,Chile
+CO,EM Main,COP Curncy,Colombia
+HU,EM Main,HUF Curncy,Hungary
+IN,EM Main,INR Curncy,India
+ID,EM Main,IDR Curncy,Indonesia
+MY,EM Main,MYR Curncy,Malaysia
+MX,EM Main,MXN Curncy,Mexico
+PE,EM Main,PEN Curncy,Peru
+PH,EM Main,PHP Curncy,Philippines
+PL,EM Main,PLN Curncy,Poland
+RO,EM Main,RON Curncy,Romania
+ZA,EM Main,ZAR Curncy,South Africa
+TH,EM Main,THB Curncy,Thailand
+AR,EM Other,ARS Curncy,Argentina
+CN,EM Other,CNY Curncy,China
+RU,EM Other,RUB Curncy,Russia
+TR,EM Other,TRY Curncy,Turkey
+KR,AE Other,KRW Curncy,Korea
+SA,AE Other,SAR Curncy,Saudi Arabia
+AT,Euro Area,EUR Curncy,Austria
+BE,Euro Area,EUR Curncy,Belgium
+FI,Euro Area,EUR Curncy,Finland
+FR,Euro Area,EUR Curncy,France
+DE,Euro Area,EUR Curncy,Germany
+GR,Euro Area,EUR Curncy,Greece
+IE,Euro Area,EUR Curncy,Ireland
+IT,Euro Area,EUR Curncy,Italy
+NL,Euro Area,EUR Curncy,Netherlands
+PT,Euro Area,EUR Curncy,Portugal
+ES,Euro Area,EUR Curncy,Spain
