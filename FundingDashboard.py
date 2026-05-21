@@ -157,7 +157,7 @@ AXIS = dict(
     showline=True,  linecolor="black", linewidth=1,
     zeroline=False,
     ticks="outside", ticklen=5, tickwidth=1, tickcolor="black",
-    tickfont=dict(size=11, color="black"),
+    tickfont=dict(size=13, color="black"),
     title_font=dict(size=11, color="black"),
     title_standoff=8,
 )
@@ -179,7 +179,7 @@ def _layout(fig: go.Figure, height: int, extra_margin_r: int = 24):
         plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
         font=dict(family="Inter, sans-serif", size=11, color=C["text"]),
         legend=dict(orientation="h", yanchor="bottom", y=1.04,
-                    xanchor="left", x=0, font=dict(size=9),
+                    xanchor="left", x=0, font=dict(size=11, color="black"),
                     bgcolor="rgba(0,0,0,0)", borderwidth=0,
                     itemsizing="constant", traceorder="normal"),
         hovermode="x unified",
@@ -460,7 +460,17 @@ st.markdown(f"""
       border-color: {C["navy"]};
   }}
   div[data-testid="stSlider"] [data-baseweb="slider"] div[style*="background"] {{
-      background-color: {C["navy"]};
+      background-color: {C["navy"]} !important;
+  }}
+  div[data-testid="stSlider"] [role="slider"] {{
+      background-color: #FFFFFF !important;
+      border: 2px solid {C["navy"]} !important;
+      box-shadow: none !important;
+  }}
+  div[data-testid="stSlider"] [data-baseweb="slider"] [aria-hidden="true"],
+  div[data-testid="stSlider"] [data-baseweb="slider"] [style*="background-color: rgb(255, 75, 75)"],
+  div[data-testid="stSlider"] [data-baseweb="slider"] [style*="background-color: rgb(255, 43, 43)"] {{
+      background-color: {C["navy"]} !important;
   }}
   hr {{ opacity: 0.20; margin: 10px 0; }}
 </style>
@@ -1126,7 +1136,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     if bx:
                         fig_og.add_trace(go.Bar(
                             x=bx, y=by, name="GC Repo - OIS",
-                            width=[0.018] * len(bx),
+                            width=[0.006] * len(bx),
                             marker_color=[gc_ois_color(v) for v in by], opacity=0.80,
                         ), secondary_y=True)
                     hline_zero(fig_og)
@@ -1271,7 +1281,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     if spread_x:
                         fig_repo_xs.add_trace(go.Bar(
                             x=spread_x, y=spread_y, name="GC Repo - OIS",
-                            width=[0.018] * len(spread_x),
+                            width=[0.006] * len(spread_x),
                             marker_color=[gc_ois_color(v) for v in spread_y], opacity=0.80,
                         ), secondary_y=True)
                     hline_zero(fig_repo_xs)
@@ -1504,24 +1514,37 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     label(f"Cross-Currency Basis Term Structure as at {xccy_ts:%d %b %Y}")
                     fig_xt = xs_fig()
                     xccy_row = xccy.loc[:xccy_ts].tail(1) if not xccy.empty else pd.DataFrame()
+                    xt_ticks = {}
                     for pi, pair in enumerate(pairs):
                         p_cs = sorted([(c, c.split("_")[-1]) for c in my_cols if pair in c],
                                       key=lambda x: parse_tenor_label(x[1]))
-                        xv2, yv2 = [], []
+                        xv2, yv2, labels2 = [], [], []
                         for col_x, tn_x in p_cs:
                             if col_x in xccy.columns and not xccy_row.empty:
                                 v = float(xccy_row[col_x].iloc[-1])
                                 if not np.isnan(v):
-                                    xv2.append(tn_x); yv2.append(v)
+                                    tau = parse_tenor_label(tn_x)
+                                    if not np.isnan(tau):
+                                        xv2.append(tau); yv2.append(v); labels2.append(tn_x)
+                                        xt_ticks[tau] = tn_x
                         if xv2:
                             fig_xt.add_trace(go.Scatter(
                                 x=xv2, y=yv2, name=pair.replace("_", " / "),
                                 mode="lines+markers",
                                 line=dict(color=TENOR_COLORS[pi % len(TENOR_COLORS)], width=2.0),
                                 marker=dict(size=5),
+                                customdata=labels2,
+                                hovertemplate="%{customdata}: %{y:.2f} bps<extra>%{fullData.name}</extra>",
                             ))
                     hline_zero(fig_xt)
-                    fig_xt.update_xaxes(title_text="Maturity", type="category")
+                    tick_items = sorted(xt_ticks.items(), key=lambda x: x[0])
+                    fig_xt.update_xaxes(
+                        title_text="Maturity (years)",
+                        type="linear",
+                        tickvals=[x[0] for x in tick_items],
+                        ticktext=[x[1] for x in tick_items],
+                        **XAXIS,
+                    )
                     fig_xt.update_yaxes(title_text="Basis (bps)")
                     chart(fig_xt, f"xccy_term_{cty}")
 
