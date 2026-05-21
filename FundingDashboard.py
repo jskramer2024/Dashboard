@@ -176,8 +176,8 @@ def _layout(fig: go.Figure, height: int, extra_margin_r: int = 24):
     fig.update_layout(
         height=height,
         margin=dict(l=60, r=extra_margin_r, t=60, b=72),
-        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif", size=11),
+        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+        font=dict(family="Inter, sans-serif", size=11, color=C["text"]),
         legend=dict(orientation="h", yanchor="bottom", y=1.04,
                     xanchor="left", x=0, font=dict(size=9),
                     bgcolor="rgba(0,0,0,0)", borderwidth=0,
@@ -365,7 +365,30 @@ st.set_page_config(
 st.markdown(f"""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-  html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
+  :root {{
+      color-scheme: light;
+      --background-color: #FFFFFF;
+      --secondary-background-color: #F3F4F6;
+      --text-color: {C["text"]};
+  }}
+  html, body, [class*="css"] {{
+      font-family: 'Inter', sans-serif;
+      background-color: #FFFFFF !important;
+      color: {C["text"]} !important;
+  }}
+  .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"],
+  [data-testid="stToolbar"], [data-testid="stMain"], section.main,
+  .block-container {{
+      background-color: #FFFFFF !important;
+      color: {C["text"]} !important;
+  }}
+  [data-testid="stSidebar"], [data-testid="stSidebarContent"] {{
+      background-color: #F8FAFC !important;
+      color: {C["text"]} !important;
+  }}
+  div[data-testid="stMarkdownContainer"], p, span, label {{
+      color: inherit;
+  }}
 
   .imf-header {{
       border-left: 4px solid {C["navy"]};
@@ -380,16 +403,16 @@ st.markdown(f"""
   }}
 
   .metric-card {{
-      background: var(--secondary-background-color);
+      background: #F3F4F6;
       border: 1px solid rgba(128,128,128,0.18);
       border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;
   }}
   .metric-label {{
       font-size: 0.67rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.08em; opacity: 0.50; margin-bottom: 3px;
-      color: var(--text-color);
+      color: {C["text"]};
   }}
-  .metric-value {{ font-size: 1.34rem; font-weight: 600; color: var(--text-color); line-height: 1.18; }}
+  .metric-value {{ font-size: 1.34rem; font-weight: 600; color: {C["text"]}; line-height: 1.18; }}
   .metric-delta {{ display: block; margin-top: 2px; }}
   .metric-pos   {{ color: {C["green"]}; font-size: 1.24rem; font-weight: 600; }}
   .metric-neg   {{ color: {C["red"]};   font-size: 1.24rem; font-weight: 600; }}
@@ -408,7 +431,7 @@ st.markdown(f"""
       font-size: 0.72rem; background: {hex_to_rgba(C["gold"], 0.22)};
       border: 1px solid {hex_to_rgba(C["gold"], 0.55)};
       border-radius: 4px; padding: 2px 8px; display: inline-block;
-      color: var(--text-color);
+      color: {C["text"]};
   }}
 
   .stTabs [data-baseweb="tab-list"] {{ gap: 2px; }}
