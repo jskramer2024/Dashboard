@@ -45,8 +45,8 @@ C = dict(
 )
 CURRENCY_COLOR = dict(US=C["navy"], EA=C["green"], GB=C["red"], JP=C["gold"])
 TENOR_COLORS   = [C["navy"], C["blue"], C["teal"], C["green"], C["gold"], C["red"]]
-CHART_H = 500
-XS_H = 500
+CHART_H = 420
+XS_H    = 420
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
 G4 = ["US", "EA", "GB", "JP"]
@@ -154,10 +154,10 @@ _EV_LINE = "rgba(110,110,110,0.28)"
 
 AXIS = dict(
     showgrid=False,
-    showline=True,  linecolor="black", linewidth=1,
+    showline=True,  linecolor="#D1D5DB", linewidth=1,
     zeroline=False,
-    ticks="outside", ticklen=5, tickwidth=1, tickcolor="black",
-    tickfont=dict(size=13, color="black"),
+    ticks="outside", ticklen=5, tickwidth=1, tickcolor="#D1D5DB",
+    tickfont=dict(size=11),
     title_font=dict(size=11),
     title_standoff=8,
 )
@@ -175,16 +175,18 @@ def hex_to_rgba(h: str, a: float) -> str:
 def _layout(fig: go.Figure, height: int, extra_margin_r: int = 24):
     fig.update_layout(
         height=height,
-        margin=dict(l=64, r=extra_margin_r, t=72, b=58),
+        margin=dict(l=60, r=extra_margin_r, t=60, b=72),
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif", size=11),
-        legend=dict(orientation="h", yanchor="bottom", y=1.055,
+        legend=dict(orientation="h", yanchor="bottom", y=1.04,
                     xanchor="left", x=0, font=dict(size=9),
-                    bgcolor="rgba(0,0,0,0)", borderwidth=0),
+                    bgcolor="rgba(0,0,0,0)", borderwidth=0,
+                    itemsizing="constant", traceorder="normal"),
         hovermode="x unified",
-        hoverlabel=dict(bgcolor="rgba(15,15,15,0.90)",
+        hoverlabel=dict(bgcolor="rgba(15,15,15,0.88)",
                         bordercolor=C["border"],
-                        font=dict(size=10, color="white")),
+                        font=dict(size=10, color="white"),
+                        namelength=40),
     )
 
 def base_fig(height: int = CHART_H) -> go.Figure:
@@ -261,10 +263,22 @@ def label(text: str):
 def note(text: str):
     st.markdown(f'<p class="chart-note">{text}</p>', unsafe_allow_html=True)
 
+def metric_note():
+    note("Bracketed values show the change from one week ago to the latest observation.")
+
+def gc_ois_color(value: float) -> str:
+    return hex_to_rgba(C["red"] if value > 0 else C["green"], 0.48)
+
+GC_OIS_COLOR_NOTE = (
+    "For GC-OIS bars, positive values are shown in red because GC repo funding is more "
+    "expensive than matched-maturity OIS; negative values are shown in green because secured "
+    "funding is cheaper than OIS."
+)
+
 def chart(fig: go.Figure, key: str):
     fig.update_yaxes(title_text="")
-    fig.update_layout(margin=dict(l=64, r=72, t=72, b=58))
-    fig.update_xaxes(automargin=False)
+    fig.update_layout(margin=dict(l=64, r=72, t=72, b=72))
+    fig.update_xaxes(automargin=True)
     fig.update_yaxes(automargin=False, tickangle=0)
     st.plotly_chart(
         fig, use_container_width=True,
@@ -375,9 +389,10 @@ st.markdown(f"""
       letter-spacing: 0.08em; opacity: 0.50; margin-bottom: 3px;
       color: var(--text-color);
   }}
-  .metric-value {{ font-size: 1.40rem; font-weight: 600; color: var(--text-color); }}
-  .metric-pos   {{ color: {C["green"]}; font-size: 0.80rem; }}
-  .metric-neg   {{ color: {C["red"]};   font-size: 0.80rem; }}
+  .metric-value {{ font-size: 1.34rem; font-weight: 600; color: var(--text-color); line-height: 1.18; }}
+  .metric-delta {{ display: block; margin-top: 2px; }}
+  .metric-pos   {{ color: {C["green"]}; font-size: 1.24rem; font-weight: 600; }}
+  .metric-neg   {{ color: {C["red"]};   font-size: 1.24rem; font-weight: 600; }}
 
   .section-label {{
       font-size: 0.70rem; font-weight: 700; text-transform: uppercase;
@@ -444,17 +459,17 @@ def metric_card(lbl: str, val: float, unit: str = "", delta: float = None):
     if np.isnan(val):
         return
     cls_d, sign, delta_html = "", "", ""
+    col_v = "inherit"
+    fmt_v = f"{val:.1f}" if unit == " bps" else f"{val:.2f}"
     if delta is not None and not np.isnan(delta):
         cls_d = "metric-pos" if delta >= 0 else "metric-neg"
         sign  = "+" if delta >= 0 else ""
-        delta_html = f'<div style="margin-top:3px"><span class="{cls_d}">{sign}{delta:.1f}{unit} ytd</span></div>'
-    col_v = C["red"] if unit == " bps" and val > 0 else (C["navy"] if unit == " bps" else "inherit")
-    fmt_v = f"{val:+.1f}" if unit == " bps" else f"{val:.2f}"
+        delta_unit = " pp" if unit == "%" else unit
+        delta_html = f'<span class="metric-delta {cls_d}">[{sign}{delta:.1f}{delta_unit}]</span>'
     st.markdown(f"""
     <div class="metric-card">
       <div class="metric-label">{lbl}</div>
-      <div class="metric-value" style="color:{col_v}">{fmt_v}{unit}</div>
-      {delta_html}
+      <div class="metric-value" style="color:{col_v}">{fmt_v}{unit}{delta_html}</div>
     </div>""", unsafe_allow_html=True)
 
 def latest_value(df: pd.DataFrame, col: Optional[str]) -> float:
@@ -468,6 +483,27 @@ def latest_series_value(s: Optional[pd.Series]) -> float:
         return np.nan
     s = s.dropna()
     return float(s.iloc[-1]) if not s.empty else np.nan
+
+def series_delta_1w(s: Optional[pd.Series]) -> float:
+    if s is None:
+        return np.nan
+    s = s.dropna()
+    if len(s) < 2:
+        return np.nan
+    target = s.index[-1] - pd.tseries.offsets.BusinessDay(5)
+    past = s[s.index <= target]
+    if past.empty:
+        return np.nan
+    return float(s.iloc[-1]) - float(past.iloc[-1])
+
+def col_series(df: pd.DataFrame, col: str) -> Optional[pd.Series]:
+    if df.empty or col not in df.columns:
+        return None
+    s = df[col].dropna()
+    return s if not s.empty else None
+
+def metric_card_series(lbl: str, s: Optional[pd.Series], unit: str = ""):
+    metric_card(lbl, latest_series_value(s), unit=unit, delta=series_delta_1w(s))
 
 # ─── Header ────────────────────────────────────────────────────────────────────
 top_l, top_r = st.columns([5, 1])
@@ -591,7 +627,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
             yc = clip(yields,  start, end)
             vc = clip(vfci,    start, end) if HAS_VFCI else pd.DataFrame()
 
-            COLOR_L = CURRENCY_COLOR.get(cty, C["navy"])
+            COLOR_L = C["navy"]
             COLOR_R = C["blue"]
 
             # Helper: pull a VFCI column, return series or None
@@ -606,15 +642,30 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                         return s if not s.empty else None
                 return None
 
-            fc1, fc2, fc3, fc4 = st.columns(4)
-            with fc1:
-                metric_card("LIQ", latest_series_value(vf("LIQ")), unit=" bps")
-            with fc2:
-                metric_card("TERM", latest_series_value(vf("TERM")), unit=" bps")
-            with fc3:
-                metric_card("SWAP_Sprd", latest_series_value(vf("SWAP_Sprd")), unit=" bps")
-            with fc4:
-                metric_card("FX Y/Y", latest_series_value(vf("FX_Ret")), unit="%")
+            # ── Metric panel — 8 key readings ─────────────────────────────────
+            _s_pr  = col_series(rc, f"{cty}_PR")
+            _s_liq = vf("LIQ")
+            _s_ter = vf("TERM")
+            _s_ig  = col_series(cc, f"{cty}_IG") if has_ig else None
+            _s_hy  = col_series(cc, f"{cty}_HY") if has_hy else None
+            _s_vol = col_series(ec, f"{cty}_VOL") if has_eq else None
+            _s_eq  = vf("EQ_Ret")
+            _s_fx  = vf("FX_Ret")
+            if _s_eq is None and f"{cty}_EQ" in ec.columns:
+                _s_eq = clip(yoy(ec[f"{cty}_EQ"].dropna()), start, end).dropna()
+            if _s_fx is None and f"{cty}_FX" in ec.columns:
+                _s_fx = clip(yoy(ec[f"{cty}_FX"].dropna()), start, end).dropna()
+            m1a, m2a, m3a, m4a = st.columns(4)
+            with m1a: metric_card("Policy Rate",     latest_series_value(_s_pr),  unit="%",    delta=series_delta_1w(_s_pr))
+            with m2a: metric_card("Liquidity (LIQ)", latest_series_value(_s_liq), unit=" bps", delta=series_delta_1w(_s_liq))
+            with m3a: metric_card("Term (TERM)",     latest_series_value(_s_ter), unit=" bps", delta=series_delta_1w(_s_ter))
+            with m4a: metric_card("IG Spread",       latest_series_value(_s_ig),  unit=" bps", delta=series_delta_1w(_s_ig))
+            m1b, m2b, m3b, m4b = st.columns(4)
+            with m1b: metric_card("HY Spread",       latest_series_value(_s_hy),  unit=" bps", delta=series_delta_1w(_s_hy))
+            with m2b: metric_card("Volatility",      latest_series_value(_s_vol), unit="%",    delta=series_delta_1w(_s_vol))
+            with m3b: metric_card("TWI Y/Y",         latest_series_value(_s_fx),  unit="%",    delta=series_delta_1w(_s_fx))
+            with m4b: metric_card("Equity Y/Y",      latest_series_value(_s_eq),  unit="%",    delta=series_delta_1w(_s_eq))
+            metric_note()
 
             # ── Chart 1: LIQ (LHS) + Policy Rate (RHS) ──────────────────────
             row1_l, row1_r = st.columns(2)
@@ -633,7 +684,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 else:
                     y1_title = "—"
                 if pr_s is not None:
-                    line(fig1, pr_s, "Policy Rate (RHS)", C["red"], width=1.5, dash="dash", sy=True)
+                    line(fig1, pr_s, "Policy Rate (RHS)", C["gray"], width=1.5, dash="dash", sy=True)
                 add_events(fig1, start)
                 fig1.update_yaxes(title_text=y1_title, secondary_y=False, **YAXIS_ZERO)
                 fig1.update_yaxes(title_text="Policy Rate (%)",
@@ -659,11 +710,11 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 else:
                     t2_lhs = "—"
                 if swap_ is not None:
-                    line(fig2, swap_, "Swap Spread (RHS)", C["red"], width=1.5, dash="dash", sy=True)
+                    line(fig2, swap_, "Swap Spread (RHS)", C["orange"], width=1.5, dash="dash", sy=True)
                     t2_rhs = "SWAP_Sprd (bps)"
                 elif is_g4 and f"{cty}_OIS_Slope" in sc.columns:
                     line(fig2, sc[f"{cty}_OIS_Slope"].dropna(),
-                         "OIS slope 3M–1D (RHS)", C["red"], width=1.5, dash="dash", sy=True)
+                         "OIS slope 3M–1D (RHS)", C["orange"], width=1.5, dash="dash", sy=True)
                     t2_rhs = "OIS 3M–1D slope (bps)"
                 else:
                     t2_rhs = "—"
@@ -672,11 +723,166 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 fig2.update_yaxes(title_text=t2_lhs, secondary_y=False, **YAXIS_ZERO)
                 fig2.update_yaxes(title_text=t2_rhs, secondary_y=True, **YAXIS_ZERO)
                 chart(fig2, f"fc_term_{cty}")
-                note("TERM is the rate differential between 10y and 3M tenors, based on swap rates with yield fallback/basis adjustment. SWAP_Sprd is the 10y swap rate less the same-maturity government yield.")
-                if cty == "US" and term is not None and swap_ is not None:
-                    term_latest = term.dropna().iloc[-1] if not term.dropna().empty else np.nan
-                    swap_latest = swap_.dropna().iloc[-1] if not swap_.dropna().empty else np.nan
-                    note(f"US factor columns: US_TERM = {term_latest:.4f}; US_SWAP_Sprd = {swap_latest:.4f}.")
+                note("TERM is the rate differential between 10Y and 3M tenors, based on swap rates "
+                     "with yield fallback/basis adjustment. SWAP_Sprd is the 10Y swap rate less the "
+                     "same-maturity government yield.")
+
+            # ── Annotated yield-curve decomposition: TERM & SWAP SPREAD ──────────
+            _curve_idx = pd.DatetimeIndex([])
+            if not ois_crv.empty:
+                _curve_idx = _curve_idx.union(clip(ois_crv, start, end).index)
+            if not yld_crv.empty:
+                _curve_idx = _curve_idx.union(clip(yld_crv, start, end).index)
+            if len(_curve_idx):
+                _min_dc = _curve_idx[0].date()
+                _max_dc = _curve_idx[-1].date()
+                _default_dc = st.session_state.get(f"fc_curve_date_{cty}", _max_dc)
+                _default_dc = min(max(_default_dc, _min_dc), _max_dc)
+                label("Swap/Government Curve Date")
+                _xs_date = st.slider(
+                    "fc_curve_date_slider",
+                    min_value=_min_dc, max_value=_max_dc,
+                    value=_default_dc, format="YYYY-MM-DD",
+                    label_visibility="collapsed", key=f"fc_curve_date_slider_{cty}",
+                )
+                st.session_state[f"fc_curve_date_{cty}"] = _xs_date
+                note(f"Selected date: {_xs_date:%d %b %Y}")
+                _xs_ts = pd.Timestamp(_xs_date)
+            else:
+                _xs_ts = pd.Timestamp(end)
+            _ois_p = curve_points(ois_crv, f"{cty}_OIS_", _xs_ts)
+            _yld_p = curve_points(yld_crv, f"{cty}_Yld_", _xs_ts)
+
+            if _ois_p or _yld_p:
+                st.divider()
+                label(
+                    f"OIS/Swap & Government Yield Curves — {_xs_ts.strftime('%d %b %Y')}"
+                    " · Term and Swap-Spread decomposition"
+                )
+                fig_dc = combined_curve_fig(height=XS_H)
+
+                if _ois_p:
+                    fig_dc.add_trace(go.Scatter(
+                        x=[p[0] for p in _ois_p], y=[p[2] for p in _ois_p],
+                        name="OIS / Swap", mode="lines+markers",
+                        line=dict(color=C["navy"], width=2.2),
+                        marker=dict(size=5, color=C["navy"]),
+                    ), secondary_y=False)
+                if _yld_p:
+                    fig_dc.add_trace(go.Scatter(
+                        x=[p[0] for p in _yld_p], y=[p[2] for p in _yld_p],
+                        name="Govt Yield", mode="lines+markers",
+                        line=dict(color=C["green"], width=2.2, dash="dash"),
+                        marker=dict(size=5, color=C["green"]),
+                    ), secondary_y=False)
+
+                # Swap-spread bars on secondary axis
+                _ois_d = {round(p[0], 5): p[2] for p in _ois_p} if _ois_p else {}
+                _sw_x, _sw_y, _sw_col = [], [], []
+                for _tau, _lbl_, _yv in (_yld_p or []):
+                    if _tau < 0.15:
+                        continue
+                    if _ois_d:
+                        _nt = min(_ois_d.keys(), key=lambda t: abs(t - _tau))
+                        if abs(_nt - _tau) < 0.40:
+                            _spd = (_ois_d[_nt] - _yv) * 100
+                            _sw_x.append(_tau)
+                            _sw_y.append(round(_spd, 2))
+                            _sw_col.append(hex_to_rgba(C["green"] if _spd > 0 else C["red"], 0.48))
+                if _sw_x:
+                    _bw = min(0.18, max(0.06, (max(_sw_x) - min(_sw_x)) / max(len(_sw_x), 1) * 0.22))
+                    fig_dc.add_trace(go.Bar(
+                        x=_sw_x, y=_sw_y, name="Swap Spread (bps)",
+                        width=[_bw] * len(_sw_x),
+                        marker_color=_sw_col, opacity=0.80,
+                    ), secondary_y=True)
+
+                # Helper: nearest value from curve_points at target tau
+                def _near(pts, tau, tol=0.6):
+                    if not pts:
+                        return None
+                    cands = [(abs(p[0] - tau), p[2]) for p in pts if abs(p[0] - tau) < tol]
+                    return min(cands, key=lambda x: x[0])[1] if cands else None
+
+                # Helper: draw bracket (caps + vertical) + text label
+                def _bracket(fig, x_c, y_lo, y_hi, txt, col, side, cap=0.22):
+                    for _yc in [y_lo, y_hi]:
+                        fig.add_shape(
+                            type="line", x0=x_c - cap, x1=x_c + cap, y0=_yc, y1=_yc,
+                            line=dict(color=col, width=1.6), xref="x", yref="y",
+                        )
+                    fig.add_shape(
+                        type="line", x0=x_c, x1=x_c, y0=y_lo, y1=y_hi,
+                        line=dict(color=col, width=1.6, dash="dot"),
+                        xref="x", yref="y",
+                    )
+                    x_txt = (x_c - cap - 0.35) if side == "left" else (x_c + cap + 0.35)
+                    fig.add_annotation(
+                        x=x_txt, y=(y_lo + y_hi) / 2,
+                        text=txt, showarrow=False,
+                        xanchor="right" if side == "left" else "left",
+                        yanchor="middle",
+                        font=dict(size=9, color=col, family="Inter, sans-serif"),
+                        bgcolor="rgba(255,255,255,0.88)", borderpad=3, borderwidth=0,
+                    )
+
+                _v3m   = _near(_ois_p, 0.25)   # OIS 3M
+                _v10oi = _near(_ois_p, 10.0)   # OIS 10Y
+                _v10yl = _near(_yld_p, 10.0)   # Yield 10Y
+
+                # ── TERM bracket (left of 10Y) ─────────────────────────────
+                if _v3m is not None and _v10oi is not None:
+                    _tb = (_v10oi - _v3m) * 100
+                    # Dotted reference line at 3M OIS level
+                    fig_dc.add_shape(
+                        type="line", x0=0.25, x1=9.0, y0=_v3m, y1=_v3m,
+                        line=dict(color=C["navy"], width=0.8, dash="dot"),
+                        xref="x", yref="y",
+                    )
+                    fig_dc.add_annotation(
+                        x=0.32, y=_v3m, text="<i>3M Swap</i>",
+                        showarrow=False, xanchor="left", yanchor="bottom",
+                        font=dict(size=8, color=C["gray"]),
+                        bgcolor="rgba(255,255,255,0.72)", borderpad=2, borderwidth=0,
+                    )
+                    _bracket(
+                        fig_dc, 9.3,
+                        min(_v3m, _v10oi), max(_v3m, _v10oi),
+                        f"<b>TERM</b><br>{_tb:+.0f} bps<br><i>10Y - 3M Swap</i>",
+                        C["navy"], side="left",
+                    )
+
+                # ── SWAP SPREAD bracket (right of 10Y) ────────────────────
+                if _v10oi is not None and _v10yl is not None:
+                    _sb = (_v10oi - _v10yl) * 100
+                    _ylo = min(_v10oi, _v10yl)
+                    _yhi = max(_v10oi, _v10yl)
+                    # Dotted connectors from 10Y curve points to bracket
+                    for _yc in [_v10oi, _v10yl]:
+                        fig_dc.add_shape(
+                            type="line", x0=10.0, x1=10.95, y0=_yc, y1=_yc,
+                            line=dict(color=C["orange"], width=0.8, dash="dot"),
+                            xref="x", yref="y",
+                        )
+                    _bracket(
+                        fig_dc, 11.1, _ylo, _yhi,
+                        f"<b>SWAP SPRD</b><br>{_sb:+.0f} bps<br><i>Swap - Gov at 10Y</i>",
+                        C["orange"], side="right",
+                    )
+
+                curve_axis(fig_dc)
+                fig_dc.update_xaxes(range=[-0.5, 33])
+                fig_dc.update_yaxes(title_text="Rate (%)", secondary_y=False, **YAXIS)
+                fig_dc.update_yaxes(title_text="Swap Spread (bps)",
+                                    secondary_y=True, **YAXIS_ZERO)
+                chart(fig_dc, f"fc_yield_decomp_{cty}")
+                note(
+                    "Left bracket (blue): TERM factor = slope of the swap curve from 3M to 10Y. "
+                    "Right bracket (orange): Swap spread = 10Y swap rate minus 10Y government yield. "
+                    "Bars show the spread across all matched maturities (right axis); positive swap "
+                    "spreads are green because government yields remain below swap rates, while "
+                    "non-positive readings are red because the government funding advantage has eroded."
+                )
 
             row2_l, row2_r = st.columns(2)
 
@@ -695,13 +901,13 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 elif ig_raw is not None and not ig_raw.empty:
                     line(fig3, ig_raw, "IG OAS (LHS)", COLOR_L, width=2.0, sy=False)
                 if hy_f is not None:
-                    line(fig3, hy_f, "HY Corp (LHS)", C["orange"], width=1.5, sy=False)
+                    line(fig3, hy_f, "HY Corp (LHS)", C["red"], width=1.5, sy=False)
                 elif hy_raw is not None and not hy_raw.empty:
-                    line(fig3, hy_raw, "HY OAS (LHS)", C["orange"], width=1.5, sy=False)
+                    line(fig3, hy_raw, "HY OAS (LHS)", C["red"], width=1.5, sy=False)
                 if vol_f is not None:
-                    line(fig3, vol_f, "Volatility (RHS)", C["purple"], width=1.5, dash="dash", sy=True)
+                    line(fig3, vol_f, "Volatility (RHS)", C["orange"], width=1.5, dash="dash", sy=True)
                 elif vol_raw is not None and not vol_raw.empty:
-                    line(fig3, vol_raw, "Implied vol (RHS)", C["purple"], width=1.5, dash="dash", sy=True)
+                    line(fig3, vol_raw, "Implied vol (RHS)", C["orange"], width=1.5, dash="dash", sy=True)
                 add_events(fig3, start)
                 fig3.update_yaxes(title_text="Spread (bps)",
                                   secondary_y=False, **YAXIS)
@@ -709,9 +915,9 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 chart(fig3, f"fc_credit_vol_{cty}")
                 note("Credit spreads show corporate risk premia on the left axis; implied equity volatility is shown on the right axis.")
 
-            # ── Chart 4: EQ Y/Y % (LHS) + FX Y/Y % (RHS) ────────────────────
+            # ── Chart 4: EQ Y/Y % (LHS) + TWI Y/Y % (RHS) ───────────────────
             with row2_r:
-                label("Equity & FX Returns (year-on-year)")
+                label("Equity & TWI Returns (year-on-year)")
                 fig4 = dual_fig()
                 eq_f  = vf("EQ_Ret")
                 fx_f  = vf("FX_Ret")
@@ -722,58 +928,30 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 elif eq_raw is not None and len(eq_raw) > 252:
                     line(fig4, clip(yoy(eq_raw), start, end).dropna(), "EQ Y/Y % (LHS)", COLOR_L, width=2.0, sy=False)
                 if fx_f is not None:
-                    line(fig4, fx_f, "FX Y/Y % (RHS)", C["red"], width=1.5, dash="dash", sy=True)
+                    line(fig4, fx_f, "TWI Y/Y % (RHS)", C["orange"], width=1.5, dash="dash", sy=True)
                 elif fx_raw is not None and len(fx_raw) > 252:
-                    line(fig4, clip(yoy(fx_raw), start, end).dropna(), "FX Y/Y % (RHS)", C["red"], width=1.5, dash="dash", sy=True)
+                    line(fig4, clip(yoy(fx_raw), start, end).dropna(), "TWI Y/Y % (RHS)", C["orange"], width=1.5, dash="dash", sy=True)
                 add_events(fig4, start)
                 hline_zero(fig4)
                 fig4.update_yaxes(title_text="EQ return (%)",
                                   secondary_y=False, **YAXIS_ZERO)
-                fig4.update_yaxes(title_text="FX return (%)",
+                fig4.update_yaxes(title_text="TWI return (%)",
                                   secondary_y=True,  **YAXIS_ZERO)
                 chart(fig4, f"fc_eq_fx_{cty}")
-                note("FX return is the one-year arithmetic return of the trade-weighted FX basket with positive returns showing domestic currency appreciation.")
+                note("TWI return is the one-year arithmetic return of the trade-weighted FX basket with positive returns showing domestic currency appreciation.")
 
 
-            # ── Chart 5: Local sov spread (LHS) + HC sov spread (RHS) ────────
-            show_sov_chart = group_choice in ["EM Main", "EM Other"]
+            # ── Chart 5: hard-currency sovereign spread for EM/AE groups ─────
+            hc_f = vf("HC_Sov")
+            show_sov_chart = group_choice in ["EM Main", "EM Other", "AE Other"] and hc_f is not None
             if show_sov_chart:
-                label("EM Sovereign Spreads — Local Currency & Hard Currency")
-            hc_f   = vf("HC_Sov")
-            sov_disp = (vc["EA_SOV_Disp"].dropna()
-                        if (HAS_VFCI and "EA_SOV_Disp" in vc.columns) else None)
-            local_f = vf("SWAP_Sprd")    # local = swap spread as proxy for local sov basis
-            sov_raw = cc[f"{cty}_EMSov"].dropna() if has_sov else None
-            ig_r2   = cc[f"{cty}_IG"].dropna()    if has_ig  else None
-
-            fig5 = dual_fig(420)
-            # LHS: local currency sovereign risk
-            if cty == "EA" and sov_disp is not None:
-                line(fig5, sov_disp, "EA Sov Dispersion (LHS)", COLOR_L, width=2.0, sy=False)
-                lhs5 = "EA sov dispersion (bps)"
-            elif sov_raw is not None and not sov_raw.empty:
-                line(fig5, sov_raw, "EM Sov spread (LHS)", COLOR_L, width=2.0, sy=False)
-                lhs5 = "EM sov spread (bps)"
-            else:
-                lhs5 = "—"
-            # RHS: hard currency sovereign risk
-            if hc_f is not None:
-                line(fig5, hc_f, "HC Sov spread (RHS)", C["red"], width=1.5, dash="dash", sy=True)
-                rhs5 = "HC sov spread (bps)"
-            elif sov_raw is not None and not sov_raw.empty:
-                line(fig5, sov_raw, "EM Sov (EMBIG) (RHS)", C["red"], width=1.5, dash="dash", sy=True)
-                rhs5 = "EMBIG stripped spread (bps)"
-            else:
-                rhs5 = "—"
-            add_events(fig5, start)
-            fig5.update_yaxes(title_text=lhs5,
-                              secondary_y=False, **YAXIS)
-            fig5.update_yaxes(title_text=rhs5,
-                              secondary_y=True,  **YAXIS)
-            if show_sov_chart:
+                label("Hard-Currency Sovereign Spread")
+                fig5 = base_fig(420)
+                area(fig5, hc_f, "HC Sov spread", C["orange"], width=1.8)
+                add_events(fig5, start)
+                fig5.update_yaxes(title_text="HC sov spread (bps)", **YAXIS_ZERO)
                 chart(fig5, f"fc_sov_{cty}")
 
-            note("Sources: Bloomberg L.P.; ICE BofA; JPMorgan; Haver Analytics; IMF staff calculations.")
 
         # ══════════════════════════════════════════════════════════════════════
         # TAB 2 — Rates & OIS
@@ -782,7 +960,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
             with tm["📈 Rates & OIS"]:
                 r_rates   = clip(rates,   start, end)
                 r_spreads = clip(spreads, start, end) if is_g4 else pd.DataFrame()
-                color     = CURRENCY_COLOR.get(cty, C["navy"])
+                color     = C["navy"]
                 pr_col    = f"{cty}_PR"
                 ois_col   = ois_1d_col(cty, rates)
 
@@ -790,34 +968,43 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 m1, m2, m3, m4 = st.columns(4)
                 with m1:
                     if has_pr:
-                        metric_card("Policy Rate", float(rates[pr_col].dropna().iloc[-1]), unit="%")
+                        metric_card_series("Policy Rate", col_series(r_rates, pr_col), unit="%")
                 with m2:
                     if ois_col:
-                        metric_card("OIS Overnight", float(rates[ois_col].dropna().iloc[-1]), unit="%")
+                        metric_card_series("OIS Overnight", col_series(r_rates, ois_col), unit="%")
                 with m3:
                     if is_g4 and f"{cty}_OIS_PR" in spreads.columns:
-                        metric_card("OIS–Policy Spread",
-                                    float(spreads[f"{cty}_OIS_PR"].dropna().iloc[-1]), unit=" bps")
+                        metric_card_series("OIS–Policy Spread", col_series(r_spreads, f"{cty}_OIS_PR"), unit=" bps")
                 with m4:
                     col_gcon = gc_ois_col(cty, "1D", spreads) if is_g4 else None
                     if col_gcon:
-                        metric_card("GC–OIS (1D)", float(spreads[col_gcon].dropna().iloc[-1]), unit=" bps")
+                        metric_card_series("GC–OIS (1D)", col_series(r_spreads, col_gcon), unit=" bps")
+                metric_note()
 
-                col_l, col_r = st.columns(2)
+                show_repo_slopes = is_g4 and (
+                    f"{cty}_OIS_Slope" in r_spreads.columns
+                    or f"{cty}_RepoSlope" in r_spreads.columns
+                    or (repo_gc_col(cty, "1D", repo_crv) and repo_gc_col(cty, "3M", repo_crv))
+                )
+                if show_repo_slopes:
+                    col_l, col_r = st.columns(2)
+                else:
+                    col_l = st.container()
+                    col_r = None
 
                 # Level chart
                 with col_l:
                     label("Policy Rate · OIS Overnight · GC Repo 1D · SC Repo 1D  (percent)")
                     fig = base_fig(height=CHART_H)
                     if has_pr:
-                        line(fig, r_rates[pr_col].dropna(), "Policy Rate", color, width=2.0)
+                        line(fig, r_rates[pr_col].dropna(), "Policy Rate", C["gray"], width=2.0)
                     if ois_col:
                         line(fig, r_rates[ois_col].dropna(), "OIS overnight", C["blue"], dash="dash")
                     col_gc = repo_gc_col(cty, "1D", repo_crv) if is_g4 else None
                     if col_gc:
                         r_repo = clip(repo_crv, start, end)
                         line(fig, r_repo[col_gc].dropna(), "GC repo 1D",
-                             color, dash="dot", width=1.2)
+                             C["green"], dash="dot", width=1.2)
                     col_sc_repo = special_repo_col(cty, repo_crv) if is_g4 else None
                     if col_sc_repo:
                         r_repo = clip(repo_crv, start, end)
@@ -827,23 +1014,24 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     chart(fig, f"rates_level_{cty}")
 
                 # OIS–PR spread
-                with col_r:
-                    label("OIS and GC Repo Slopes  (3M minus 1D, basis points)")
-                    fig2 = base_fig(height=CHART_H)
-                    if is_g4 and f"{cty}_OIS_Slope" in r_spreads.columns:
-                        line(fig2, r_spreads[f"{cty}_OIS_Slope"].dropna(),
-                             "OIS 3M-1D", C["blue"], width=2.0)
-                    col_gc1 = repo_gc_col(cty, "1D", repo_crv) if is_g4 else None
-                    col_gc3 = repo_gc_col(cty, "3M", repo_crv) if is_g4 else None
-                    if col_gc1 and col_gc3:
-                        r_repo = clip(repo_crv, start, end)
-                        gc_slope = (r_repo[col_gc3] - r_repo[col_gc1]) * 100
-                        line(fig2, gc_slope.dropna(), "GC repo 3M-1D", C["green"], width=2.0)
-                    if is_g4 and f"{cty}_RepoSlope" in r_spreads.columns:
-                        area(fig2, r_spreads[f"{cty}_RepoSlope"].dropna(),
-                             "GC-OIS slope spread", C["red"], width=1.5)
-                    add_events(fig2, start)
-                    chart(fig2, f"rates_slopes_{cty}")
+                if show_repo_slopes and col_r is not None:
+                    with col_r:
+                        label("OIS and GC Repo Slopes  (3M minus 1D, basis points)")
+                        fig2 = base_fig(height=CHART_H)
+                        if f"{cty}_OIS_Slope" in r_spreads.columns:
+                            line(fig2, r_spreads[f"{cty}_OIS_Slope"].dropna(),
+                                 "OIS 3M-1D", C["blue"], width=2.0)
+                        col_gc1 = repo_gc_col(cty, "1D", repo_crv)
+                        col_gc3 = repo_gc_col(cty, "3M", repo_crv)
+                        if col_gc1 and col_gc3:
+                            r_repo = clip(repo_crv, start, end)
+                            gc_slope = (r_repo[col_gc3] - r_repo[col_gc1]) * 100
+                            line(fig2, gc_slope.dropna(), "GC repo 3M-1D", C["green"], width=2.0)
+                        if f"{cty}_RepoSlope" in r_spreads.columns:
+                            area(fig2, r_spreads[f"{cty}_RepoSlope"].dropna(),
+                                 "GC-OIS slope spread", C["red"], width=1.5)
+                        add_events(fig2, start)
+                        chart(fig2, f"rates_slopes_{cty}")
 
                 if is_g4:
                     st.divider()
@@ -895,8 +1083,8 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     if bx:
                         fig_og.add_trace(go.Bar(
                             x=bx, y=by, name="GC Repo - OIS",
-                            width=[0.035] * len(bx),
-                            marker_color=hex_to_rgba(C["red"], 0.45), opacity=0.80,
+                            width=[0.018] * len(bx),
+                            marker_color=[gc_ois_color(v) for v in by], opacity=0.80,
                         ), secondary_y=True)
                     hline_zero(fig_og)
                     mm_axis(fig_og)
@@ -904,8 +1092,10 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     fig_og.update_yaxes(title_text="GC - OIS (bps)",
                                         secondary_y=True, **YAXIS_ZERO)
                     chart(fig_og, f"rates_ois_gc_curve_{cty}")
+                    gc_ois_note = LOG_NOTES.get(cty, {}).get("GC_OIS", "")
+                    note(" ".join([x for x in [gc_ois_note, GC_OIS_COLOR_NOTE] if x]))
 
-                # Slope row + cross-section (G4 only)
+                # Slope row + cross-section (G4 only) — legacy, disabled
                 if False and is_g4:
                     st.divider()
                     label("Term slopes  (3M–1D differential, basis points)")
@@ -926,7 +1116,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                             clicked_ois = []
 
                     with col_s2:
-                        label("Repo spread slope: (GC–OIS 3M) − (GC–OIS 1D)")
+                        label("Repo spread slope: (GC–OIS 3M) - (GC–OIS 1D)")
                         fig_s2 = base_fig(height=XS_H)
                         sc_rp = f"{cty}_RepoSlope"
                         if sc_rp in r_spreads.columns:
@@ -939,128 +1129,29 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                             chart(fig_s2, f"rates_legacy_repo_slope_{cty}")
                             clicked_repo = []
 
-                    # Resolve clicked date
-                    clicked_date = None
-                    if HAS_PLOTLY_EVENTS:
-                        for src in [clicked_ois, clicked_repo]:
-                            if src:
-                                try: clicked_date = pd.Timestamp(src[0]["x"])
-                                except Exception: pass
-                                break
-                        if clicked_date is not None:
-                            st.session_state[f"xs_{cty}"] = clicked_date.date()
 
-                    # Cross-section date selector
-                    st.divider()
-                    col_cs_ctrl, _ = st.columns([2, 3])
-                    with col_cs_ctrl:
-                        label("Cross-section date")
-                        all_idx = spreads.index if not spreads.empty else rates.index
-                        default_xs = st.session_state.get(
-                            f"xs_{cty}",
-                            all_idx[-1].date() if len(all_idx) else end.date(),
-                        )
-                        xs_date = st.date_input(
-                            "xs", value=default_xs,
-                            min_value=all_idx[0].date(), max_value=all_idx[-1].date(),
-                            label_visibility="collapsed", key=f"xs_{cty}",
-                        )
-                    if clicked_date:
-                        st.caption("↑ Click any point above to jump to that date.")
-
-                    xs_ts = pd.Timestamp(xs_date)
-                    xs_lbl = xs_ts.strftime("%d %b %Y")
-                    label(f"Rate curves at {xs_lbl}")
-                    col_oc, col_sc_sp = st.columns(2)
-
-                    # OIS curve cross-section
-                    ois_cols_parsed = sorted(
-                        [(parse_tenor_label(c.replace(f"{cty}_OIS_", "")),
-                          c.replace(f"{cty}_OIS_", ""), c)
-                         for c in ois_crv.columns if c.startswith(f"{cty}_OIS_")
-                         and not np.isnan(parse_tenor_label(c.replace(f"{cty}_OIS_", "")))]
-                    )
-                    with col_oc:
-                        fig_oc = xs_fig()
-                        xv, yv = get_curve_at(ois_crv, ois_cols_parsed, xs_ts)
-                        if xv:
-                            fig_oc.add_trace(go.Scatter(
-                                x=xv, y=yv, name="OIS curve",
-                                mode="lines+markers",
-                                line=dict(color=C["navy"], width=2.0),
-                                marker=dict(size=5, color=C["navy"]),
-                            ))
-                        fig_oc.update_xaxes(
-                            title_text="Maturity (years)", type="log",
-                            tickvals=[1/252, 1/52, 1/12, 0.25, 0.5, 1, 2, 5, 10, 30],
-                            ticktext=["1D","1W","1M","3M","6M","1Y","2Y","5Y","10Y","30Y"],
-                            **XAXIS,
-                        )
-                        fig_oc.update_yaxes(title_text="Rate (%)")
-                        fig_oc.update_layout(showlegend=False,
-                            title=dict(text="OIS / Swap Rate Curve",
-                                       font=dict(size=11, color=C["sub"])))
-                        chart(fig_oc, f"rates_legacy_ois_curve_{cty}")
-
-                    # GC-OIS spread curve cross-section (capped at 1Y)
-                    with col_sc_sp:
-                        fig_gc = xs_fig()
-                        sp_x, sp_y = [], []
-                        for tn, yr in zip(REPO_TENORS, REPO_TAU):
-                            col_s = gc_ois_col(cty, tn, spreads)
-                            if col_s:
-                                row_s = spreads.loc[:xs_ts].tail(1)
-                                if not row_s.empty:
-                                    v = float(row_s[col_s].iloc[-1])
-                                    if not np.isnan(v):
-                                        sp_x.append(yr); sp_y.append(v)
-                        if sp_x:
-                            fig_gc.add_trace(go.Scatter(
-                                x=sp_x, y=sp_y, name="GC–OIS",
-                                mode="lines+markers",
-                                line=dict(color=C["red"], width=2.0),
-                                marker=dict(size=5, color=C["red"]),
-                                fill="tozeroy",
-                                fillcolor=hex_to_rgba(C["red"], 0.12),
-                            ))
-                        hline_zero(fig_gc)
-                        fig_gc.update_xaxes(
-                            title_text="Maturity (years)", type="log",
-                            tickvals=REPO_TAU, ticktext=REPO_TENORS,
-                            range=[np.log10(1/252 * 0.8), np.log10(1.25)],
-                            **XAXIS,
-                        )
-                        fig_gc.update_yaxes(title_text="Spread (bps)")
-                        fig_gc.update_layout(showlegend=False,
-                            title=dict(text="GC Repo – OIS Spread Curve",
-                                       font=dict(size=11, color=C["sub"])))
-                        chart(fig_gc, f"rates_legacy_gc_curve_{cty}")
-
-                note("Sources: Bloomberg L.P.; Haver Analytics. "
-                     "OIS = overnight indexed swap (Swap curve, 1D column). "
-                     "GC = general collateral repo. Spreads in basis points (bps).")
-
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # TAB 3 — Funding & Repo
-        # ══════════════════════════════════════════════════════════════════════
-        if "💧 Funding & Repo" in tm:
-            with tm["💧 Funding & Repo"]:
+        # ======================================================================
+        if "\U0001f4a7 Funding & Repo" in tm:
+            with tm["\U0001f4a7 Funding & Repo"]:
                 r_repo    = clip(repo_crv, start, end)
                 r_spreads = clip(spreads,  start, end)
-                color     = CURRENCY_COLOR.get(cty, C["navy"])
+                color     = C["navy"]
                 gc_note   = LOG_NOTES.get(cty, {}).get("GC_OIS", "")
 
                 f1, f2, f3, f4 = st.columns(4)
                 with f1:
                     cp_cols_now = cp_ois_cols(r_spreads) if cty == "US" else {}
                     first_cp = next(iter(cp_cols_now.keys()), None)
-                    metric_card("CP-OIS 1M", latest_value(r_spreads, first_cp), unit=" bps")
+                    metric_card_series("CP-OIS 1M", col_series(r_spreads, first_cp) if first_cp else None, unit=" bps")
                 with f2:
-                    metric_card("GC Repo 1D", latest_value(r_repo, repo_gc_col(cty, "1D", r_repo)), unit="%")
+                    metric_card_series("GC Repo 1D", col_series(r_repo, repo_gc_col(cty, "1D", r_repo)), unit="%")
                 with f3:
-                    metric_card("GC-OIS 1D", latest_value(r_spreads, gc_ois_col(cty, "1D", r_spreads)), unit=" bps")
+                    metric_card_series("GC-OIS 1D", col_series(r_spreads, gc_ois_col(cty, "1D", r_spreads)), unit=" bps")
                 with f4:
-                    metric_card("SC-GC 1D", latest_value(r_spreads, f"{cty}_SC_GC"), unit=" bps")
+                    metric_card_series("SC-GC 1D", col_series(r_spreads, f"{cty}_SC_GC"), unit=" bps")
+                metric_note()
 
                 if cty == "US":
                     cp_cols = cp_ois_cols(r_spreads)
@@ -1089,6 +1180,64 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 chart(fig_rl, f"funding_gc_levels_{cty}")
                 if gc_note: note(gc_note)
 
+                if not r_repo.empty:
+                    st.divider()
+                    repo_idx = r_repo.index
+                    min_repo_date = repo_idx[0].date()
+                    max_repo_date = repo_idx[-1].date()
+                    default_repo_xs = st.session_state.get(f"repo_curve_date_{cty}", max_repo_date)
+                    default_repo_xs = min(max(default_repo_xs, min_repo_date), max_repo_date)
+                    label("GC Repo Curve Date")
+                    repo_xs = st.slider(
+                        "repo_curve_date_slider",
+                        min_value=min_repo_date, max_value=max_repo_date,
+                        value=default_repo_xs, format="YYYY-MM-DD",
+                        label_visibility="collapsed", key=f"repo_curve_date_slider_{cty}",
+                    )
+                    st.session_state[f"repo_curve_date_{cty}"] = repo_xs
+                    repo_ts = pd.Timestamp(repo_xs)
+                    note(f"Selected date: {repo_xs:%d %b %Y}")
+                    label(f"GC Repo and OIS Curves as at {repo_ts:%d %b %Y}")
+                    fig_repo_xs = combined_curve_fig(height=XS_H)
+                    repo_row = repo_crv.loc[:repo_ts].tail(1) if not repo_crv.empty else pd.DataFrame()
+                    spread_row = spreads.loc[:repo_ts].tail(1) if not spreads.empty else pd.DataFrame()
+                    ois_pts_repo = curve_points(ois_crv, f"{cty}_OIS_", repo_ts, max_tau=1.01)
+                    if ois_pts_repo:
+                        fig_repo_xs.add_trace(go.Scatter(
+                            x=[p[0] for p in ois_pts_repo], y=[p[2] for p in ois_pts_repo],
+                            name="OIS/Swap", mode="lines+markers",
+                            line=dict(color=C["navy"], width=2.2), marker=dict(size=6),
+                        ), secondary_y=False)
+                    repo_x, repo_y, spread_x, spread_y = [], [], [], []
+                    for tn, tau in zip(REPO_TENORS, REPO_TAU):
+                        col_rg = repo_gc_col(cty, tn, repo_crv)
+                        col_sp = gc_ois_col(cty, tn, spreads)
+                        if col_rg and not repo_row.empty:
+                            v = float(repo_row[col_rg].iloc[-1])
+                            if not np.isnan(v):
+                                repo_x.append(tau); repo_y.append(v)
+                        if col_sp and not spread_row.empty:
+                            v = float(spread_row[col_sp].iloc[-1])
+                            if not np.isnan(v):
+                                spread_x.append(tau); spread_y.append(v)
+                    if repo_x:
+                        fig_repo_xs.add_trace(go.Scatter(
+                            x=repo_x, y=repo_y, name="GC Repo", mode="lines+markers",
+                            line=dict(color=C["green"], width=2.2, dash="dash"), marker=dict(size=6),
+                        ), secondary_y=False)
+                    if spread_x:
+                        fig_repo_xs.add_trace(go.Bar(
+                            x=spread_x, y=spread_y, name="GC Repo - OIS",
+                            width=[0.018] * len(spread_x),
+                            marker_color=[gc_ois_color(v) for v in spread_y], opacity=0.80,
+                        ), secondary_y=True)
+                    hline_zero(fig_repo_xs)
+                    mm_axis(fig_repo_xs)
+                    fig_repo_xs.update_yaxes(title_text="Rate (%)", secondary_y=False, **YAXIS)
+                    fig_repo_xs.update_yaxes(title_text="GC - OIS (bps)", secondary_y=True, **YAXIS_ZERO)
+                    chart(fig_repo_xs, f"funding_gc_repo_curve_{cty}")
+                    note(GC_OIS_COLOR_NOTE)
+
                 # SC–GC spread
                 sc_col = f"{cty}_SC_GC"
                 if sc_col in r_spreads.columns:
@@ -1103,7 +1252,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     sc_note = LOG_NOTES.get(cty, {}).get("SC_GC", "")
                     if sc_note: note(sc_note)
 
-                # CP–OIS (US only)
+                # CP–OIS (US only, disabled)
                 if False and cty == "US":
                     cp_cols = cp_ois_cols(r_spreads)
                     if cp_cols:
@@ -1120,16 +1269,11 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                         chart(fig_cp, f"funding_cp_legacy_{cty}")
 
 
-                note("Sources: Bloomberg L.P.; Haver Analytics; OFR; DTCC. "
-                     "GC = general collateral. SC = special collateral. "
-                     "Spreads = repo minus matched-maturity OIS. "
-                     + gc_note)
-
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # TAB 4 — Yield Curve
-        # ══════════════════════════════════════════════════════════════════════
-        if "📉 Yield Curve" in tm:
-            with tm["📉 Yield Curve"]:
+        # ======================================================================
+        if "\U0001f4c9 Yield Curve" in tm:
+            with tm["\U0001f4c9 Yield Curve"]:
                 r_ylds = clip(yields,  start, end)
                 r_ycrv = clip(yld_crv, start, end)
 
@@ -1188,13 +1332,12 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     fig_yc.update_layout(showlegend=False)
                     chart(fig_yc, f"yield_curve_{cty}")
 
-                note("Sources: Bloomberg L.P.; LSEG. Government benchmark yields.")
 
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # TAB 5 — Credit
-        # ══════════════════════════════════════════════════════════════════════
-        if "💳 Credit" in tm:
-            with tm["💳 Credit"]:
+        # ======================================================================
+        if "\U0001f4b3 Credit" in tm:
+            with tm["\U0001f4b3 Credit"]:
                 r_cred = clip(credit, start, end)
 
                 label("Credit Spreads  (basis points, option-adjusted)")
@@ -1208,15 +1351,12 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 add_events(fig_cr, start)
                 chart(fig_cr, f"credit_{cty}")
 
-                note("Sources: Bloomberg L.P.; ICE BofA indices; JPMorgan EMBIG. "
-                     "IG/HY = investment grade / high yield option-adjusted spreads. "
-                     "EM Sov = EMBIG stripped spread.")
 
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # TAB 6 — Equity & FX
-        # ══════════════════════════════════════════════════════════════════════
-        if "📊 Equity & FX" in tm:
-            with tm["📊 Equity & FX"]:
+        # ======================================================================
+        if "\U0001f4ca Equity & FX" in tm:
+            with tm["\U0001f4ca Equity & FX"]:
                 r_ef = clip(eqfx, start, end)
                 eq_c = f"{cty}_EQ"; fx_c = f"{cty}_FX"; vol_c = f"{cty}_VOL"
 
@@ -1251,14 +1391,12 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                     add_events(fig_fx, start)
                     chart(fig_fx, f"fx_{cty}")
 
-                note("Sources: Bloomberg L.P.; BIS. "
-                     "Equity and FX rebased to 100 at start of selected sample period.")
 
-        # ══════════════════════════════════════════════════════════════════════
+        # ======================================================================
         # TAB 7 — Cross-Currency Basis
-        # ══════════════════════════════════════════════════════════════════════
-        if "🌐 Cross-Currency" in tm:
-            with tm["🌐 Cross-Currency"]:
+        # ======================================================================
+        if "\U0001f310 Cross-Currency" in tm:
+            with tm["\U0001f310 Cross-Currency"]:
                 r_xccy = clip(xccy, start, end)
                 my_cols = [c for c in r_xccy.columns if c.startswith(f"{cty}_Xccy")]
 
@@ -1277,13 +1415,14 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                         key=lambda c: tenor_rank.get(c.split("_")[-1], 99),
                     )
                     with x1:
-                        metric_card("Basis Short", latest_value(r_xccy, ranked_cols[0] if ranked_cols else None), unit=" bps")
+                        metric_card_series("Basis Short", col_series(r_xccy, ranked_cols[0] if ranked_cols else None), unit=" bps")
                     with x2:
-                        metric_card("Basis 1Y", latest_value(r_xccy, next((c for c in my_cols if c.endswith("_1Y")), None)), unit=" bps")
+                        metric_card_series("Basis 1Y", col_series(r_xccy, next((c for c in my_cols if c.endswith("_1Y")), None)), unit=" bps")
                     with x3:
-                        metric_card("Basis 5Y", latest_value(r_xccy, next((c for c in my_cols if c.endswith("_5Y")), None)), unit=" bps")
+                        metric_card_series("Basis 5Y", col_series(r_xccy, next((c for c in my_cols if c.endswith("_5Y")), None)), unit=" bps")
                     with x4:
-                        metric_card("Basis 10Y", latest_value(r_xccy, next((c for c in my_cols if c.endswith("_10Y")), None)), unit=" bps")
+                        metric_card_series("Basis 10Y", col_series(r_xccy, next((c for c in my_cols if c.endswith("_10Y")), None)), unit=" bps")
+                    metric_note()
 
                     label("Cross-Currency Basis Swaps vs SOFR  (basis points)")
                     note("Negative = non-USD currency at a discount to SOFR. "
@@ -1305,19 +1444,32 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
 
                     # Term structure snapshot
                     st.divider()
-                    label("Cross-Currency Basis Term Structure  (latest date)")
+                    min_xccy_date = r_xccy.index[0].date()
+                    max_xccy_date = r_xccy.index[-1].date()
+                    default_xccy_date = st.session_state.get(f"xccy_curve_date_{cty}", max_xccy_date)
+                    default_xccy_date = min(max(default_xccy_date, min_xccy_date), max_xccy_date)
+                    label("Cross-Currency Term Structure Date")
+                    xccy_date = st.slider(
+                        "xccy_curve_date_slider",
+                        min_value=min_xccy_date, max_value=max_xccy_date,
+                        value=default_xccy_date, format="YYYY-MM-DD",
+                        label_visibility="collapsed", key=f"xccy_curve_date_slider_{cty}",
+                    )
+                    st.session_state[f"xccy_curve_date_{cty}"] = xccy_date
+                    xccy_ts = pd.Timestamp(xccy_date)
+                    note(f"Selected date: {xccy_date:%d %b %Y}")
+                    label(f"Cross-Currency Basis Term Structure as at {xccy_ts:%d %b %Y}")
                     fig_xt = xs_fig()
+                    xccy_row = xccy.loc[:xccy_ts].tail(1) if not xccy.empty else pd.DataFrame()
                     for pi, pair in enumerate(pairs):
                         p_cs = sorted([(c, c.split("_")[-1]) for c in my_cols if pair in c],
                                       key=lambda x: parse_tenor_label(x[1]))
                         xv2, yv2 = [], []
                         for col_x, tn_x in p_cs:
-                            if col_x in xccy.columns:
-                                v = xccy[col_x].dropna()
-                                if not v.empty:
-                                    yr = parse_tenor_label(tn_x)
-                                    if not np.isnan(yr):
-                                        xv2.append(yr); yv2.append(float(v.iloc[-1]))
+                            if col_x in xccy.columns and not xccy_row.empty:
+                                v = float(xccy_row[col_x].iloc[-1])
+                                if not np.isnan(v):
+                                    xv2.append(tn_x); yv2.append(v)
                         if xv2:
                             fig_xt.add_trace(go.Scatter(
                                 x=xv2, y=yv2, name=pair.replace("_", " / "),
@@ -1326,14 +1478,12 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                                 marker=dict(size=5),
                             ))
                     hline_zero(fig_xt)
-                    fig_xt.update_xaxes(title_text="Maturity (years)")
+                    fig_xt.update_xaxes(title_text="Maturity", type="category")
                     fig_xt.update_yaxes(title_text="Basis (bps)")
                     chart(fig_xt, f"xccy_term_{cty}")
 
-                    note("Sources: Haver Analytics. "
-                         "Cross-currency basis swaps, non-collateralised, fixed reset vs SOFR.")
 
-# ─── Footer ────────────────────────────────────────────────────────────────────
+# ─── Footer ──────────────────────────────────────────────────────────────────────────────
 st.divider()
 st.markdown(
     f'<p style="font-size:0.72rem;color:{C["sub"]}">'
@@ -1344,4 +1494,3 @@ st.markdown(
     "Cross-currency basis: Haver INTDAILY (2023–present).</p>",
     unsafe_allow_html=True,
 )
-
