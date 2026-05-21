@@ -154,11 +154,11 @@ _EV_LINE = "rgba(110,110,110,0.28)"
 
 AXIS = dict(
     showgrid=False,
-    showline=True,  linecolor="#D1D5DB", linewidth=1,
+    showline=True,  linecolor="black", linewidth=1,
     zeroline=False,
-    ticks="outside", ticklen=5, tickwidth=1, tickcolor="#D1D5DB",
-    tickfont=dict(size=11),
-    title_font=dict(size=11),
+    ticks="outside", ticklen=5, tickwidth=1, tickcolor="black",
+    tickfont=dict(size=11, color="black"),
+    title_font=dict(size=11, color="black"),
     title_standoff=8,
 )
 XAXIS = {**AXIS, "tickangle": -45}
@@ -367,9 +367,11 @@ st.markdown(f"""
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   :root {{
       color-scheme: light;
+      --primary-color: {C["navy"]};
       --background-color: #FFFFFF;
       --secondary-background-color: #F3F4F6;
       --text-color: {C["text"]};
+      --link-color: {C["navy"]};
   }}
   html, body, [class*="css"] {{
       font-family: 'Inter', sans-serif;
@@ -386,7 +388,7 @@ st.markdown(f"""
       background-color: #F8FAFC !important;
       color: {C["text"]} !important;
   }}
-  div[data-testid="stMarkdownContainer"], p, span, label {{
+  div[data-testid="stMarkdownContainer"] {{
       color: inherit;
   }}
 
@@ -438,9 +440,27 @@ st.markdown(f"""
   .stTabs [data-baseweb="tab"] {{
       padding: 7px 16px; font-size: 0.83rem; font-weight: 500;
       border-radius: 6px 6px 0 0;
+      color: {C["text"]} !important;
+  }}
+  .stTabs [data-baseweb="tab"][aria-selected="true"] {{
+      color: {C["navy"]} !important;
+      border-bottom-color: {C["navy"]} !important;
+  }}
+  .stTabs [data-baseweb="tab-highlight"] {{
+      background-color: {C["navy"]} !important;
+  }}
+  div[data-testid="stRadio"] label,
+  div[data-testid="stRadio"] p {{
+      color: {C["text"]} !important;
   }}
   div[data-testid="stRadio"] div[role="radiogroup"] {{
       flex-direction: row; gap: 6px; flex-wrap: wrap;
+  }}
+  div[data-testid="stSlider"] [data-baseweb="slider"] div {{
+      border-color: {C["navy"]};
+  }}
+  div[data-testid="stSlider"] [data-baseweb="slider"] div[style*="background"] {{
+      background-color: {C["navy"]};
   }}
   hr {{ opacity: 0.20; margin: 10px 0; }}
 </style>
