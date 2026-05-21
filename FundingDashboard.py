@@ -478,10 +478,18 @@ st.markdown(f"""
 
 # ─── Data loading ──────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
-def load(name: str) -> pd.DataFrame:
+def load(name: str, file_stamp: tuple[int, int] | None = None) -> pd.DataFrame:
     p = DATA_DIR / name
-    if not p.exists(): return pd.DataFrame()
+    if not p.exists():
+        return pd.DataFrame()
     return pd.read_csv(p, parse_dates=["Date"], index_col="Date")
+
+def data_file_stamp(name: str) -> tuple[int, int] | None:
+    p = DATA_DIR / name
+    if not p.exists():
+        return None
+    stat = p.stat()
+    return (stat.st_size, stat.st_mtime_ns)
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_meta() -> pd.DataFrame:
@@ -491,22 +499,23 @@ def load_meta() -> pd.DataFrame:
 
 with st.spinner("Loading market data…"):
     meta     = load_meta()
-    rates    = load("rates.csv")
-    yields   = load("yields_key.csv")
-    credit   = load("credit.csv")
-    eqfx     = load("equity_fx.csv")
-    ois_crv  = load("g4_ois_curves.csv")
-    yld_crv  = load("g4_yield_curves.csv")
-    repo_crv = load("g4_repo_curves.csv")
-    spreads  = load("g4_spreads.csv")
-    xccy     = load("g4_xccy.csv")
-    vfci     = load("vfci_factors.csv")   # may be empty if not yet exported
+    rates    = load("rates.csv", data_file_stamp("rates.csv"))
+    yields   = load("yields_key.csv", data_file_stamp("yields_key.csv"))
+    credit   = load("credit.csv", data_file_stamp("credit.csv"))
+    eqfx     = load("equity_fx.csv", data_file_stamp("equity_fx.csv"))
+    ois_crv  = load("g4_ois_curves.csv", data_file_stamp("g4_ois_curves.csv"))
+    yld_crv  = load("g4_yield_curves.csv", data_file_stamp("g4_yield_curves.csv"))
+    repo_crv = load("g4_repo_curves.csv", data_file_stamp("g4_repo_curves.csv"))
+    spreads  = load("g4_spreads.csv", data_file_stamp("g4_spreads.csv"))
+    xccy     = load("g4_xccy.csv", data_file_stamp("g4_xccy.csv"))
+    vfci     = load("vfci_factors.csv", data_file_stamp("vfci_factors.csv"))
 
 if meta.empty:
     st.error("No data found in `dashboard_data/`. Run `export_dashboard_data.m` in MATLAB first.")
     st.stop()
 
 HAS_VFCI = not vfci.empty
+VFCI_FILE_EXISTS = (DATA_DIR / "vfci_factors.csv").exists()
 
 def metric_card(lbl: str, val: float, unit: str = "", delta: float = None):
     if np.isnan(val):
@@ -601,9 +610,13 @@ with ctl3:
             unsafe_allow_html=True,
         )
     if not HAS_VFCI:
+        vfci_msg = (
+            "⚠ vfci_factors.csv found but loaded empty — Financial Conditions tab uses proxy series."
+            if VFCI_FILE_EXISTS else
+            "⚠ vfci_factors.csv not found — Financial Conditions tab uses proxy series. Run Example_Factors.m."
+        )
         st.markdown(
-            '<span class="data-flag">⚠ vfci_factors.csv not found — '
-            'Financial Conditions tab uses proxy series. Run Example_Factors.m.</span>',
+            f'<span class="data-flag">{vfci_msg}</span>',
             unsafe_allow_html=True,
         )
 
@@ -745,7 +758,7 @@ for tab_i, (cty_tab, cty) in enumerate(zip(country_tabs, group_ctys)):
                 chart(fig1, f"fc_liq_{cty}")
                 note("LIQ is the short-end liquidity premium: it is defined as 3M market/OIS rate relative to the overnight or policy-rate anchor, with the latter shown on the right axis.")
                 if liq is None:
-                    note("Fallback: OIS–PR spread used (vfci_factors.csv not loaded)")
+                    note("Fallback: OIS–PR spread used because the VFCI LIQ factor is unavailable for this country/sample.")
 
             # ── Chart 2: TERM spread (LHS) + Swap Spread (RHS) ───────────────
             with row1_r:
